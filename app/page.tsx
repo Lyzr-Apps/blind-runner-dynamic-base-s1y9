@@ -1,13 +1,10 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { callAIAgent } from '@/lib/aiAgent'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import {
   VscTerminalBash,
@@ -19,9 +16,8 @@ import {
   VscFolder,
   VscRefresh,
   VscCircleFilled,
+  VscArchive,
 } from 'react-icons/vsc'
-
-const AGENT_ID = '699d920db4b231da1d17df9f'
 
 const DEFAULT_URL =
   'https://gist.githubusercontent.com/pradipta-lyzr/d4b49d8869a1a3b496a899e0bc4cb3c9/raw/54e55d0b9d1dc90ebc3b4c0fa0877ee4f018e0e8/system_health_monitor.sh'
@@ -30,6 +26,9 @@ interface ArtifactItem {
   filename: string
   size: string
   modified: string
+  type?: string
+  download_url?: string
+  children?: ArtifactItem[]
 }
 
 interface ExecutionResult {
@@ -39,20 +38,7 @@ interface ExecutionResult {
   artifact_count: number
   artifacts: ArtifactItem[]
   message: string
-}
-
-const SAMPLE_RESULT: ExecutionResult = {
-  status: 'Success',
-  exit_code: 0,
-  timestamp: '2025-02-24T14:32:07Z',
-  artifact_count: 4,
-  artifacts: [
-    { filename: 'system_report.log', size: '24.5 KB', modified: '2025-02-24T14:32:05Z' },
-    { filename: 'cpu_metrics.csv', size: '8.1 KB', modified: '2025-02-24T14:32:06Z' },
-    { filename: 'memory_snapshot.json', size: '3.2 KB', modified: '2025-02-24T14:32:06Z' },
-    { filename: 'disk_usage_summary.txt', size: '1.7 KB', modified: '2025-02-24T14:32:07Z' },
-  ],
-  message: 'Script executed successfully. 4 artifact files generated in /artifacts/ directory.',
+  run_id?: string
 }
 
 function isValidUrl(str: string): boolean {
@@ -212,8 +198,17 @@ function StatusCard({ result }: { result: ExecutionResult }) {
           <Separator className="bg-border" />
           <div className="flex items-center justify-between text-xs font-mono">
             <span className="text-muted-foreground tracking-wider">ARTIFACTS</span>
-            <span className="text-foreground">{result.artifact_count ?? 0} files generated</span>
+            <span className="text-foreground">{result.artifact_count ?? 0} file(s) generated</span>
           </div>
+          {result.run_id && (
+            <>
+              <Separator className="bg-border" />
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-muted-foreground tracking-wider">RUN ID</span>
+                <span className="text-foreground text-[10px]">{result.run_id}</span>
+              </div>
+            </>
+          )}
           {result.message && (
             <>
               <Separator className="bg-border" />
@@ -228,29 +223,56 @@ function StatusCard({ result }: { result: ExecutionResult }) {
   )
 }
 
+function triggerDownload(url: string, filename: string) {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 function ArtifactCard({ artifact }: { artifact: ArtifactItem }) {
   const ext = getFileExtension(artifact?.filename ?? '')
+  const isDir = artifact?.type === 'directory'
+  const children = Array.isArray(artifact?.children) ? artifact.children : []
 
   const handleDownload = useCallback(() => {
-    alert(`Download not available in simulated mode.\nFile: ${artifact?.filename ?? 'unknown'}`)
-  }, [artifact?.filename])
+    if (artifact?.download_url) {
+      triggerDownload(artifact.download_url, artifact.filename || 'artifact')
+    }
+  }, [artifact?.download_url, artifact?.filename])
+
+  const handleChildDownload = useCallback((child: ArtifactItem) => {
+    if (child?.download_url) {
+      triggerDownload(child.download_url, child.filename || 'file')
+    }
+  }, [])
 
   return (
     <Card className="border border-border bg-card transition-colors duration-200 hover:bg-secondary">
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 min-w-0 flex-1">
-            <VscFile className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            {isDir ? (
+              <VscArchive className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            ) : (
+              <VscFile className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-mono text-foreground tracking-wider truncate">
                 {artifact?.filename ?? 'unknown'}
               </p>
               <div className="flex items-center gap-3 mt-1">
-                {ext && (
+                {isDir ? (
+                  <Badge variant="outline" className="text-[10px] font-mono tracking-wider px-1.5 py-0">
+                    DIR
+                  </Badge>
+                ) : ext ? (
                   <Badge variant="outline" className="text-[10px] font-mono tracking-wider px-1.5 py-0">
                     .{ext}
                   </Badge>
-                )}
+                ) : null}
                 <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
                   {artifact?.size ?? '--'}
                 </span>
@@ -265,11 +287,55 @@ function ArtifactCard({ artifact }: { artifact: ArtifactItem }) {
             size="sm"
             className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
             onClick={handleDownload}
-            title="Download artifact"
+            disabled={!artifact?.download_url}
+            title={isDir ? 'Download entire directory as .tar.gz' : 'Download artifact'}
           >
             <VscCloudDownload className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* Show individual files inside directory */}
+        {isDir && children.length > 0 && (
+          <div className="mt-3 pt-2 border-t border-border space-y-2">
+            <p className="text-[10px] font-mono tracking-wider text-muted-foreground uppercase">
+              Contents ({children.length} files)
+            </p>
+            {children.map((child, idx) => {
+              const childExt = getFileExtension(child?.filename ?? '')
+              return (
+                <div
+                  key={child?.filename ?? idx}
+                  className="flex items-center justify-between gap-2 pl-2 py-1 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <VscFile className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs font-mono text-foreground tracking-wider truncate">
+                      {child?.filename ?? 'unknown'}
+                    </span>
+                    {childExt && (
+                      <Badge variant="outline" className="text-[9px] font-mono tracking-wider px-1 py-0">
+                        .{childExt}
+                      </Badge>
+                    )}
+                    <span className="text-[9px] font-mono text-muted-foreground tracking-wider flex-shrink-0">
+                      {child?.size ?? ''}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
+                    onClick={() => handleChildDownload(child)}
+                    disabled={!child?.download_url}
+                    title={`Download ${child?.filename}`}
+                  >
+                    <VscCloudDownload className="w-3 h-3" />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -285,7 +351,7 @@ function ArtifactBrowser({ artifacts }: { artifacts: ArtifactItem[] }) {
           <div className="flex flex-col items-center gap-3 text-muted-foreground">
             <VscFolder className="w-8 h-8" />
             <p className="text-xs font-mono tracking-wider text-center">
-              No artifacts yet -- run a script to generate files.
+              No artifacts generated by this execution.
             </p>
           </div>
         </CardContent>
@@ -301,7 +367,7 @@ function ArtifactBrowser({ artifacts }: { artifacts: ArtifactItem[] }) {
           Generated Artifacts ({safeArtifacts.length})
         </h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {safeArtifacts.map((artifact, idx) => (
           <ArtifactCard key={artifact?.filename ?? idx} artifact={artifact} />
         ))}
@@ -310,22 +376,31 @@ function ArtifactBrowser({ artifacts }: { artifacts: ArtifactItem[] }) {
   )
 }
 
-function AgentInfoPanel({ activeAgentId }: { activeAgentId: string | null }) {
+function ExecutionPipelineInfo({ isActive }: { isActive: boolean }) {
   return (
     <Card className="border border-border bg-card">
       <CardContent className="py-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <VscCircleFilled
-              className={`w-2 h-2 ${activeAgentId ? 'text-primary animate-pulse' : 'text-muted-foreground'}`}
+              className={`w-2 h-2 ${isActive ? 'text-primary animate-pulse' : 'text-muted-foreground'}`}
             />
             <span className="text-[10px] font-mono tracking-wider text-muted-foreground uppercase">
-              Execution Orchestrator Agent
+              Blind Execution Pipeline
             </span>
           </div>
           <span className="text-[10px] font-mono tracking-wider text-muted-foreground">
-            {activeAgentId ? 'ACTIVE' : 'IDLE'}
+            {isActive ? 'EXECUTING' : 'IDLE'}
           </span>
+        </div>
+        <div className="mt-2 flex items-center gap-1 text-[10px] font-mono tracking-wider text-muted-foreground">
+          <span>curl</span>
+          <span className="text-primary">-{'>'}</span>
+          <span>chmod +x</span>
+          <span className="text-primary">-{'>'}</span>
+          <span>bash</span>
+          <span className="text-primary">-{'>'}</span>
+          <span>artifacts</span>
         </div>
       </CardContent>
     </Card>
@@ -338,17 +413,15 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
-  const [showSample, setShowSample] = useState(false)
-
-  const displayResult = showSample ? SAMPLE_RESULT : executionResult
 
   const handleRunScript = useCallback(async () => {
-    if (!scriptUrl.trim()) {
+    const trimmedUrl = scriptUrl.trim()
+
+    if (!trimmedUrl) {
       setUrlError('URL is required')
       return
     }
-    if (!isValidUrl(scriptUrl.trim())) {
+    if (!isValidUrl(trimmedUrl)) {
       setUrlError('Invalid URL. Must start with http:// or https://')
       return
     }
@@ -357,32 +430,37 @@ export default function Page() {
     setIsLoading(true)
     setError(null)
     setExecutionResult(null)
-    setActiveAgentId(AGENT_ID)
 
     try {
-      const result = await callAIAgent(
-        `Execute the script from this URL: ${scriptUrl.trim()}. Download it using curl, make it executable with chmod +x, execute it with bash directing output to /artifacts/ directory. Report only the execution status, exit code, and list of generated artifact files with their sizes and timestamps. Do NOT read or display the script contents or artifact contents.`,
-        AGENT_ID
-      )
+      // Call our server-side execute API that actually downloads + runs the script
+      const response = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmedUrl }),
+      })
 
-      if (result.success && result?.response?.result) {
-        const data = result.response.result
-        setExecutionResult({
-          status: data?.status || 'Unknown',
-          exit_code: data?.exit_code ?? -1,
-          timestamp: data?.timestamp || new Date().toISOString(),
-          artifact_count: data?.artifact_count ?? 0,
-          artifacts: Array.isArray(data?.artifacts) ? data.artifacts : [],
-          message: data?.message || '',
-        })
-      } else {
-        setError(result?.error || result?.response?.message || 'Execution failed. No valid response received.')
+      const data = await response.json()
+
+      if (data.success === false && !data.status) {
+        // Hard error from the API
+        setError(data.error || 'Execution pipeline failed')
+        return
       }
+
+      // Map the response to our ExecutionResult shape
+      setExecutionResult({
+        status: data.status || 'Unknown',
+        exit_code: data.exit_code ?? -1,
+        timestamp: data.timestamp || new Date().toISOString(),
+        artifact_count: data.artifact_count ?? 0,
+        artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
+        message: data.message || '',
+        run_id: data.run_id || undefined,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error occurred')
     } finally {
       setIsLoading(false)
-      setActiveAgentId(null)
     }
   }, [scriptUrl])
 
@@ -392,7 +470,6 @@ export default function Page() {
     setExecutionResult(null)
     setError(null)
     setIsLoading(false)
-    setActiveAgentId(null)
   }, [])
 
   const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -403,6 +480,7 @@ export default function Page() {
   return (
     <InlineErrorBoundary>
       <div className="min-h-screen bg-background text-foreground font-mono tracking-wider relative">
+        {/* CRT scanline overlay */}
         <div
           className="pointer-events-none fixed inset-0 z-40"
           style={{
@@ -414,18 +492,8 @@ export default function Page() {
 
         <main className="pt-16 pb-8 px-4">
           <div className="max-w-3xl mx-auto space-y-4">
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Label htmlFor="sample-toggle" className="text-[10px] font-mono tracking-wider text-muted-foreground cursor-pointer">
-                Sample Data
-              </Label>
-              <Switch
-                id="sample-toggle"
-                checked={showSample}
-                onCheckedChange={setShowSample}
-              />
-            </div>
-
-            <Card className="border border-border bg-card">
+            {/* URL Input Section */}
+            <Card className="border border-border bg-card mt-2">
               <CardContent className="p-4">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -450,7 +518,10 @@ export default function Page() {
                     >
                       {isLoading ? (
                         <>
-                          <span className="w-3 h-3 border border-primary-foreground border-t-transparent animate-spin" style={{ borderRadius: '50%', display: 'inline-block' }} />
+                          <span
+                            className="w-3 h-3 border border-primary-foreground border-t-transparent animate-spin"
+                            style={{ borderRadius: '50%', display: 'inline-block' }}
+                          />
                           RUN
                         </>
                       ) : (
@@ -470,9 +541,11 @@ export default function Page() {
               </CardContent>
             </Card>
 
-            {isLoading && !showSample && <LoadingState />}
+            {/* Loading State */}
+            {isLoading && <LoadingState />}
 
-            {error && !showSample && (
+            {/* Error Display */}
+            {error && !isLoading && (
               <Card className="border border-destructive bg-card">
                 <CardContent className="py-4 px-4">
                   <div className="flex items-start gap-2">
@@ -485,14 +558,16 @@ export default function Page() {
               </Card>
             )}
 
-            {displayResult && !isLoading && (
+            {/* Execution Result + Artifacts */}
+            {executionResult && !isLoading && (
               <>
-                <StatusCard result={displayResult} />
-                <ArtifactBrowser artifacts={displayResult.artifacts} />
+                <StatusCard result={executionResult} />
+                <ArtifactBrowser artifacts={executionResult.artifacts} />
               </>
             )}
 
-            {!displayResult && !isLoading && !error && (
+            {/* Empty State */}
+            {!executionResult && !isLoading && !error && (
               <Card className="border border-border bg-card">
                 <CardContent className="py-8">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -508,7 +583,8 @@ export default function Page() {
               </Card>
             )}
 
-            {(displayResult || error) && !isLoading && (
+            {/* Run Again Button */}
+            {(executionResult || error) && !isLoading && (
               <div className="flex justify-center">
                 <Button
                   variant="outline"
@@ -523,7 +599,8 @@ export default function Page() {
 
             <Separator className="bg-border" />
 
-            <AgentInfoPanel activeAgentId={activeAgentId} />
+            {/* Pipeline Status */}
+            <ExecutionPipelineInfo isActive={isLoading} />
           </div>
         </main>
       </div>
