@@ -1,0 +1,9 @@
+{
+  "agents": {
+    "execution_orchestrator": {
+      "agent_id": "699d920db4b231da1d17df9f",
+      "name": "Execution Orchestrator Agent",
+      "type": "single"
+    }
+  }
+}

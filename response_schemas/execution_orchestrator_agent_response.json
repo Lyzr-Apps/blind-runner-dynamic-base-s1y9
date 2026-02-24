@@ -1,0 +1,44 @@
+{
+  "agent_name": "Execution Orchestrator Agent",
+  "agent_id": "699d920db4b231da1d17df9f",
+  "description": "Receives a script URL from the user, constructs a blind download-and-execute command chain, monitors execution status via exit codes, and reports back success/failure along with a list of generated artifact filenames \u2014 without ever reading file contents or script source.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "status": "string",
+    "exit_code": "number",
+    "timestamp": "string",
+    "artifact_count": "number",
+    "artifacts": [
+      {
+        "filename": "string",
+        "size": "string",
+        "modified": "string"
+      }
+    ],
+    "message": "string"
+  },
+  "example_response": {
+    "status": "Execution status: Success or Failed",
+    "exit_code": 0,
+    "timestamp": "ISO timestamp of when execution completed",
+    "artifact_count": 0,
+    "artifacts": [
+      {
+        "filename": "Name of the artifact file",
+        "size": "File size with unit",
+        "modified": "Last modified timestamp"
+      }
+    ],
+    "message": "Brief status message about the execution"
+  },
+  "has_module_outputs": true,
+  "module_outputs_example": {
+    "artifact_files": [
+      {
+        "file_url": "https://example.com/file.pdf"
+      }
+    ]
+  }
+}

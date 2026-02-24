@@ -1,0 +1,21 @@
+{
+  "agent_id": "699d920db4b231da1d17df9f",
+  "agent_name": "Execution Orchestrator Agent",
+  "agent_type": "json",
+  "accessor": "json",
+  "has_module_outputs": false,
+  "schema": {
+    "status": "string",
+    "exit_code": "integer",
+    "timestamp": "string",
+    "artifact_count": "integer",
+    "artifacts": [
+      {
+        "filename": "string",
+        "size": "string",
+        "modified": "string"
+      }
+    ],
+    "message": "string"
+  }
+}

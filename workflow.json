@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "Script URL Input",
+      "nodeCategory": "input"
+    },
+    {
+      "id": "execution_orchestrator",
+      "type": "Agent",
+      "label": "Execution Orchestrator Agent",
+      "nodeCategory": "agent"
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Execution Results",
+      "nodeCategory": "end"
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_node",
+      "target": "execution_orchestrator"
+    },
+    {
+      "source": "execution_orchestrator",
+      "target": "output_node"
+    }
+  ]
+}
