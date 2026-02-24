@@ -192,19 +192,17 @@ export async function POST(request: NextRequest) {
       run_id: runId,
     })
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        status: 'Failed',
-        exit_code: -1,
-        timestamp: new Date().toISOString(),
-        artifact_count: 0,
-        artifacts: [],
-        message: error?.message || 'Internal server error during execution',
-        error: error?.message || 'Internal server error',
-      },
-      { status: 500 }
-    )
+    // Return 200 with error details in body -- fetchWrapper swallows 500 responses
+    return NextResponse.json({
+      success: false,
+      status: 'Failed',
+      exit_code: -1,
+      timestamp: new Date().toISOString(),
+      artifact_count: 0,
+      artifacts: [],
+      message: error?.message || 'Internal server error during execution',
+      error: error?.message || 'Internal server error',
+    })
   } finally {
     // Cleanup: remove the temp working directory (artifacts are already copied)
     if (workDir) {

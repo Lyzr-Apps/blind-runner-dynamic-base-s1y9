@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
+import fetchWrapper from '@/lib/fetchWrapper'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -223,13 +224,13 @@ function StatusCard({ result }: { result: ExecutionResult }) {
   )
 }
 
-function triggerDownload(url: string, filename: string) {
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+function triggerDownload(url: string, _filename: string): void {
+  // The /api/artifacts endpoint sets Content-Disposition: attachment headers.
+  // Assigning window.location.href to a URL that returns attachment headers
+  // triggers a browser download WITHOUT navigating away from the page.
+  // This is the most reliable method across all iframe sandbox configurations.
+  const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url
+  window.location.href = fullUrl
 }
 
 function ArtifactCard({ artifact }: { artifact: ArtifactItem }) {
@@ -433,16 +434,22 @@ export default function Page() {
 
     try {
       // Call our server-side execute API that actually downloads + runs the script
-      const response = await fetch('/api/execute', {
+      // Use fetchWrapper so it goes through the proxy properly
+      const response = await fetchWrapper('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmedUrl }),
       })
 
+      // fetchWrapper can return undefined on certain errors
+      if (!response) {
+        setError('Request failed -- could not reach execution API')
+        return
+      }
+
       const data = await response.json()
 
       if (data.success === false && !data.status) {
-        // Hard error from the API
         setError(data.error || 'Execution pipeline failed')
         return
       }
