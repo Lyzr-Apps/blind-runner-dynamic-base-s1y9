@@ -1,0 +1,8 @@
+=== uname ===
+Linux e2b.local 6.1.158 #2 SMP PREEMPT_DYNAMIC Tue Feb 10 19:26:22 UTC 2026 x86_64 GNU/Linux
+
+=== whoami ===
+root
+
+=== pwd ===
+/tmp/run_1771935387892_9hfnqr

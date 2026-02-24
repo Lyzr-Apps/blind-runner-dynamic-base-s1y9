@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
                   size: formatBytes(childStat.size),
                   modified: childStat.mtime.toISOString(),
                   type: 'file',
-                  download_url: `/api/artifacts?run_id=${runId}&filename=${encodeURIComponent(filename)}&subpath=${encodeURIComponent(child)}`,
+                  download_url: `/api/artifacts/${runId}/${encodeURIComponent(filename)}/${encodeURIComponent(child)}`,
                 })
               }
             }
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
             size: formatBytes(dirSize),
             modified: stat.mtime.toISOString(),
             type: 'directory',
-            download_url: `/api/artifacts?run_id=${runId}&filename=${encodeURIComponent(filename)}`,
+            download_url: `/api/artifacts/${runId}/${encodeURIComponent(filename)}`,
             children,
           })
         } else {
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
             size: formatBytes(stat.size),
             modified: stat.mtime.toISOString(),
             type: 'file',
-            download_url: `/api/artifacts?run_id=${runId}&filename=${encodeURIComponent(filename)}`,
+            download_url: `/api/artifacts/${runId}/${encodeURIComponent(filename)}`,
           })
         }
       } catch {
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
           size: '0 B',
           modified: new Date().toISOString(),
           type: 'file',
-          download_url: `/api/artifacts?run_id=${runId}&filename=${encodeURIComponent(filename)}`,
+          download_url: `/api/artifacts/${runId}/${encodeURIComponent(filename)}`,
         })
       }
     }
